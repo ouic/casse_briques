@@ -34,6 +34,8 @@ let gameStarted = false;
 let countdown = 3;
 let bricksRemaining = brickRowCount * brickColumnCount;
 let gameOverFlag = false; // Flag to indicate game over
+let gamePaused = false; // Flag to indicate game paused
+let gameStopped = false; // Flag to indicate game stopped
 
 let bricks = [];
 
@@ -58,11 +60,25 @@ function keyDownHandler(e) {
   if (e.key === 'Right' || e.key === 'ArrowRight') {
     rightPressed = true;
   } else if (e.key === 'Left' || e.key === 'ArrowLeft') {
-    leftPressed = true;
-  } else if (!gameStarted && !gameOverFlag && (e.key === 'Space' || e.key === ' ')) {
+    leftPressed = false;
+  } else if (!gameStarted && !gameOverFlag && !gamePaused && !gameStopped && (e.key === ' ' || e.key === 'Space' || e.key === 'Escape' || e.key === 'Esc')) {
     startGame();
-  } else if (gameOverFlag && (e.key === 'Space' || e.key === ' ')) {
-    resetGame(); // Reset and restart game on space after game over
+  } else if (gameOverFlag && (e.key === ' ' || e.key === 'Space' || e.key === 'Escape' || e.key === 'Esc')) {
+    resetGame(); // Reset and restart game on space or escape after game over
+  }  else if ((e.key === 'Escape' || e.key === 'Esc') ) {
+    if (gamePaused) {
+      togglePauseGame(); // Resume game if paused
+    } else if (gameStarted && !gameOverFlag && !gameStopped && !gamePaused) {
+      togglePauseGame(); // Pause/Unpause game on Escape key
+    } else if (!gameStarted && !gameOverFlag) {
+      startGame(); // Start game if stopped or before game start
+    }
+  } else if ((e.key === ' ' || e.key === 'Space')) {
+    if (gamePaused) {
+      togglePauseGame(); // Resume game if paused
+    } else if (gameStarted && !gameOverFlag && !gameStopped && !gamePaused) {
+      togglePauseGame(); // Pause/Unpause game on Space key
+    }
   }
 }
 
@@ -202,9 +218,12 @@ function levelUp() {
 }
 
 function startGame() {
-  if (!gameStarted) {
+  if (!gameStarted && !gamePaused && !gameStopped) { //Game can't start if paused or stopped
     gameStarted = true;
+    gameStopped = false; // Reset gameStopped flag when starting a new game
     clearInterval(gameInterval);
+  } else if (gamePaused) {
+    gamePaused = false; //Unpause if game was paused
   }
 }
 
@@ -219,11 +238,15 @@ function updateCountdown() {
 function gameOver() {
   gameOverFlag = true; // Set game over flag
   gameStarted = false;
+  gamePaused = false; // Game is not paused on game over
+  gameStopped = false; // Game is not stopped on game over
   clearInterval(gameInterval); // Stop countdown if running
 }
 
 function resetGame() {
   gameOverFlag = false;
+  gamePaused = false;
+  gameStopped = false;
   level = 1;
   score = 0;
   lives = 5;
@@ -236,6 +259,17 @@ function resetGame() {
   gameInterval = setInterval(updateCountdown, 1000);
 }
 
+function togglePauseGame() {
+  gamePaused = !gamePaused;
+}
+
+function stopGame() {
+  gameStopped = true;
+  gamePaused = false; // Ensure game is unpaused when stopped
+  gameStarted = false; // Stop ball movement
+  clearInterval(gameInterval); // Stop countdown if running
+}
+
 
 function drawGameOver() {
   ctx.font = '30px Arial';
@@ -244,7 +278,28 @@ function drawGameOver() {
   ctx.fillText('Game Over!', canvas.width / 2, canvas.height / 2 - 40);
   ctx.fillText('Score: ' + score, canvas.width / 2, canvas.height / 2 );
   ctx.font = '16px Arial';
-  ctx.fillText('Press SPACE to play again', canvas.width / 2, canvas.height / 2 + 40);
+  ctx.fillText('Press SPACE or ESC to play again', canvas.width / 2, canvas.height / 2 + 40);
+  ctx.textAlign = 'start';
+}
+
+function drawPauseScreen() {
+  ctx.font = '30px Arial';
+  ctx.fillStyle = 'rgba(0, 149, 221, 0.75)'; // Slightly transparent blue
+  ctx.textAlign = 'center';
+  ctx.fillText('Paused', canvas.width / 2, canvas.height / 2);
+  ctx.font = '16px Arial';
+  ctx.fillText('Press ESC or SPACE to continue', canvas.width / 2, canvas.height / 2 + 40);
+  ctx.textAlign = 'start';
+}
+
+function drawStopScreen() {
+  ctx.font = '30px Arial';
+  ctx.fillStyle = 'rgba(0, 149, 221, 0.75)'; // Slightly transparent blue
+  ctx.textAlign = 'center';
+  ctx.fillText('Game Stopped', canvas.width / 2, canvas.height / 2);
+  ctx.font = '16px Arial';
+  ctx.fillText('Press SPACE or ESC to play', canvas.width / 2, canvas.height / 2 + 40);
+
   ctx.textAlign = 'start';
 }
 
@@ -257,13 +312,23 @@ function draw() {
   drawScore();
   drawLives();
   drawLevel();
-  if (!gameStarted && !gameOverFlag) {
+  if (!gameStarted && !gameOverFlag && !gamePaused && !gameStopped) {
     drawCountdown();
   }
 
   if (gameOverFlag) {
     drawGameOver(); // Draw game over screen
     return; // Stop game loop if game is over
+  }
+
+  if (gamePaused) {
+    drawPauseScreen(); // Draw pause screen
+    return; // Stop game loop if game is paused
+  }
+
+  if (gameStopped) {
+    drawStopScreen(); // Draw stop screen
+    return; // Stop game loop if game is stopped
   }
 
 
@@ -277,7 +342,7 @@ function draw() {
   }
 
 
-  if (gameStarted) {
+  if (gameStarted && !gamePaused && !gameStopped) { // Only update game elements if not paused or stopped
     x += dx; // Ball moves only when gameStarted is true
     y += dy;
 
